@@ -1,5 +1,7 @@
 hg = require("harfang")
 
+local enable_physics_debug = false
+
 function CreatePhysicCubeEx(scene, size, mtx, model_ref, materials, rb_type, mass)
 	local rb_type = rb_type or hg.RBT_Dynamic
 	local mass = mass or 0
@@ -49,13 +51,23 @@ win = hg.RenderInit('Physics Test', res_x, res_y, hg.RF_VSync | hg.RF_MSAA4X)
 pipeline = hg.CreateForwardPipeline()
 res = hg.PipelineResources()
 
+-- AAA pipeline
+pipeline_aaa_config = hg.ForwardPipelineAAAConfig()
+pipeline_aaa = hg.CreateForwardPipelineAAAFromAssets("core", pipeline_aaa_config, hg.BR_Equal, hg.BR_Equal)
+pipeline_aaa_config.z_thickness = 0.1
+pipeline_aaa_config.sample_count = 3
+pipeline_aaa_config.temporal_aa_weight = 0.01
+-- pipeline_aaa_config.sample_count = 3
+-- pipeline_aaa_config.sample_count = 3
+
 -- physics debug
 vtx_line_layout = hg.VertexLayoutPosFloatColorUInt8()
 line_shader = hg.LoadProgramFromAssets("shaders/pos_rgb")
 
 -- create material
 pbr_shader = hg.LoadPipelineProgramRefFromAssets('core/shader/pbr.hps', res, hg.GetForwardPipelineInfo())
-mat_grey = hg.CreateMaterial(pbr_shader, 'uBaseOpacityColor', hg.Vec4(1, 1, 1), 'uOcclusionRoughnessMetalnessColor', hg.Vec4(1, 0.5, 0.05))
+mat_grey = hg.CreateMaterial(pbr_shader, 'uBaseOpacityColor', hg.Vec4(0.25, 0.5, 1), 'uOcclusionRoughnessMetalnessColor', hg.Vec4(1, 0.15, 0.05))
+mat_chrome = hg.CreateMaterial(pbr_shader, 'uBaseOpacityColor', hg.Vec4(0.35, 0.7, 1), 'uOcclusionRoughnessMetalnessColor', hg.Vec4(1, 0.01, 0.5))
 
 -- create models
 vtx_layout = hg.VertexLayoutPosFloatNormUInt8()
@@ -66,7 +78,7 @@ cube_ref = res:AddModel('cube', hg.CreateCubeModel(vtx_layout, cube_size.x, cube
 
 -- cylinder
 cylinder_radius = 0.25
-cylinder_height = 10
+cylinder_height = 20
 cylinder_ref = res:AddModel('cylinder', hg.CreateCylinderModel(vtx_layout, cylinder_radius, cylinder_height, 16))
 
 -- ground
@@ -76,6 +88,10 @@ ground_ref = res:AddModel('ground', hg.CreateCubeModel(vtx_layout, ground_size.x
 -- setup the scene
 scene = hg.Scene()
 
+-- fog
+scene.environment.fog_near = 12.0
+scene.environment.fog_far = 16.0
+
 cam_mat = hg.TransformationMat4(hg.Vec3(0, 6, -8.5), hg.Vec3(hg.Deg(25), 0, 0))
 cam = hg.CreateCamera(scene, cam_mat, 0.01, 1000, hg.Deg(30))
 view_matrix = hg.InverseFast(cam_mat)
@@ -84,26 +100,36 @@ projection_matrix = hg.ComputePerspectiveProjectionMatrix(c:GetZNear(), c:GetZFa
 
 scene:SetCurrentCamera(cam)	
 
-lgt = hg.CreateLinearLight(scene, hg.TransformationMat4(hg.Vec3(0, 0, 0), hg.Vec3(hg.Deg(30), hg.Deg(30), 0)), hg.Color(1, 1, 1), hg.Color(1, 1, 1), 10, hg.LST_Map, 0.00025, hg.Vec4(2, 4, 10, 16))
+lgt = hg.CreateLinearLight(scene, hg.TransformationMat4(hg.Vec3(0, 0, 0), hg.Vec3(hg.Deg(110), hg.Deg(0), 0)), hg.Color(1, 1, 1), hg.Color(1, 1, 1), 10, hg.LST_Map, 0.00025, hg.Vec4(5, 10, 25, 50))
 
 -- cube_node = hg.CreatePhysicCube(scene, cube_size, hg.TranslationMat4(hg.Vec3(0, 1, 2.5)), cube_ref, {mat_grey}, 0)
-floor, rb_floor = CreatePhysicCubeEx(scene, ground_size, hg.TranslationMat4(hg.Vec3(0, -0.5, 0)), ground_ref, {mat_grey}, hg.RBT_Static, 0)
+floor, rb_floor = CreatePhysicCubeEx(scene, ground_size, hg.TranslationMat4(hg.Vec3(0, -0.5, 0)), ground_ref, {mat_chrome}, hg.RBT_Static, 0)
+rb_floor:SetRestitution(1.0)
+rb_floor:SetFriction(1.0)
 
 cylinders_list = {}
 
-cylinder_mtx = hg.TransformationMat4(hg.Vec3(0, 5, 0), hg.Vec3(hg.Deg(0), hg.Deg(0), hg.Deg(90)))
-cylinder_node, cylinder_rb = CreatePhysicCylinderEx(scene, cylinder_radius, cylinder_height, cylinder_mtx, cylinder_ref, {mat_grey}, hg.RBT_Dynamic, 1.0)
-table.insert(cylinders_list, cylinder_node)
+local i, _y, _s, _r, _m
+_y = 5
+_s = 1.0
+_m = 6.0
+_z = {_s + (0.1 * _m), _s - (0.1 * _m), _s + (0.0 * _m), _s + (0.2 * _m), _s - (0.2 * _m), _s + (0.0 * _m)}
+_r = 1.0
+for i = 1, 15 do
+	cylinder_mtx = hg.TransformationMat4(hg.Vec3(0, _y, _z[math.fmod(i, #_z) + 1]), hg.Vec3(hg.Deg(0), hg.Deg(0), hg.Deg(90)))
+	cylinder_node, cylinder_rb = CreatePhysicCylinderEx(scene, cylinder_radius, cylinder_height, cylinder_mtx, cylinder_ref, {mat_grey}, hg.RBT_Dynamic, 1.0)
+	cylinder_rb:SetRestitution(_r)
+	cylinder_rb:SetFriction(1.0)
+	table.insert(cylinders_list, cylinder_node)
 
-cylinder_mtx = hg.TransformationMat4(hg.Vec3(0, 10, 0.15), hg.Vec3(hg.Deg(0), hg.Deg(0), hg.Deg(90)))
-cylinder_node, cylinder_rb = CreatePhysicCylinderEx(scene, cylinder_radius, cylinder_height, cylinder_mtx, cylinder_ref, {mat_grey}, hg.RBT_Dynamic, 1.0)
-table.insert(cylinders_list, cylinder_node)
+	_y = _y + 10.0
+end
 
 
 -- scene physics
 physics = hg.SceneBullet3Physics()
 physics:SceneCreatePhysicsFromAssets(scene)
-physics_step = hg.time_from_sec_f(1 / 60)
+physics_step = hg.time_from_sec_f(1 / 600)
 dt_frame_step = hg.time_from_sec_f(1 / 60)
 
 clocks = hg.SceneClocks()
@@ -122,6 +148,8 @@ mouse = hg.Mouse()
 
 vtx = hg.Vertices(vtx_line_layout, 2)
 vid_scene_opaque = 0
+
+local frame = 0
 
 while not keyboard:Down(hg.K_Escape) and hg.IsWindowOpen(win) do
     keyboard:Update()
@@ -146,17 +174,20 @@ while not keyboard:Down(hg.K_Escape) and hg.IsWindowOpen(win) do
 
     view_id = 0
     hg.SceneUpdateSystems(scene, clocks, dt_frame_step, physics, physics_step, 3)
-    view_id, pass_id = hg.SubmitSceneToPipeline(view_id, scene, hg.IntRect(0, 0, res_x, res_y), true, pipeline, res)
+    -- view_id, pass_id = hg.SubmitSceneToPipeline(view_id, scene, hg.IntRect(0, 0, res_x, res_y), true, pipeline, res)
+    view_id, pass_id = hg.SubmitSceneToPipeline(view_id, scene, hg.IntRect(0, 0, res_x, res_y), true, pipeline, res, pipeline_aaa, pipeline_aaa_config, frame)
 	vid_scene_opaque = hg.GetSceneForwardPipelinePassViewId(pass_id, hg.SFPP_Opaque)
 
     -- Debug physics display
-    hg.SetViewClear(view_id, 0, 0, 1.0, 0)
-    hg.SetViewRect(view_id, 0, 0, res_x, res_y)
-    hg.SetViewTransform(view_id, hg.InverseFast(cam:GetTransform():GetWorld()), hg.ComputePerspectiveProjectionMatrix(c:GetZNear(), c:GetZFar(), hg.FovToZoomFactor(c:GetFov()), hg.Vec2(res_x / res_y, 1)))
-    rs = hg.ComputeRenderState(hg.BM_Opaque, hg.DT_Disabled, hg.FC_Disabled)
-    physics:RenderCollision(view_id, vtx_line_layout, line_shader, rs, 0)
+	if enable_physics_debug then
+		hg.SetViewClear(view_id, 0, 0, 1.0, 0)
+		hg.SetViewRect(view_id, 0, 0, res_x, res_y)
+		hg.SetViewTransform(view_id, hg.InverseFast(cam:GetTransform():GetWorld()), hg.ComputePerspectiveProjectionMatrix(c:GetZNear(), c:GetZFar(), hg.FovToZoomFactor(c:GetFov()), hg.Vec2(res_x / res_y, 1)))
+		rs = hg.ComputeRenderState(hg.BM_Opaque, hg.DT_Disabled, hg.FC_Disabled)
+		physics:RenderCollision(view_id, vtx_line_layout, line_shader, rs, 0)
+	end
 
-    hg.Frame()
+    frame = hg.Frame()
     hg.UpdateWindow(win)
 end
 
