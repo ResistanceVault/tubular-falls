@@ -40,6 +40,32 @@ function CreatePhysicCylinderEx(scene, radius, height, mtx, model_ref, materials
 	return node, rb
 end
 
+function PrepareCapture(tex_width, tex_height)
+	-- create a 512x512 frame buffer to draw the scene to
+	tex_width = tex_width or 512
+	tex_height = tex_height or 512
+
+	local picture = hg.Picture(tex_width, tex_height, hg.PF_RGBA32)
+
+	local tex_color = hg.CreateTexture(tex_width, tex_height, "color_texture", hg.TF_RenderTarget, hg.TF_RGBA8)
+	local tex_color_ref = res:AddTexture("tex_rb", tex_color)
+	local tex_depth =  hg.CreateTexture(tex_width, tex_height, "depth_texture", hg.TF_RenderTarget, hg.TF_D24)
+	local frame_buffer = hg.CreateFrameBuffer(tex_color, tex_depth, "framebuffer")
+
+	local tex_readback = hg.CreateTexture(tex_width, tex_height, "readback", hg.TF_ReadBack | hg.TF_BlitDestination, hg.TF_RGBA8)
+
+	-- create a plane model to display the render texture
+	local vtx_layout = hg.VertexLayoutPosFloatNormUInt8TexCoord0UInt8()
+
+	local screen_mdl = hg.CreatePlaneModel(vtx_layout, 2, 2 * (res_y / res_x), 1, 1)
+	local screen_ref = res:AddModel('screen', screen_mdl)
+
+	-- prepare the cube shader program
+	local screen_prg = hg.LoadProgramFromAssets('shaders/texture')
+
+	return picture, tex_color, tex_color_ref, tex_depth, frame_buffer, tex_readback, vtx_layout, screen_mdl, screen_ref, screen_prg
+end
+
 hg.AddAssetsFolder('assets_compiled')
 
 -- main window
@@ -61,9 +87,12 @@ pipeline_aaa_config.temporal_aa_weight = 0.01
 -- pipeline_aaa_config.sample_count = 3
 -- pipeline_aaa_config.sample_count = 3
 
--- physics debug
-vtx_line_layout = hg.VertexLayoutPosFloatColorUInt8()
-line_shader = hg.LoadProgramFromAssets("shaders/pos_rgb")
+-- screen capture
+picture, tex_color, tex_color_ref, tex_depth, frame_buffer, tex_readback, vtx_layout, screen_mdl, screen_ref, screen_prg = PrepareCapture(res_x, res_y)
+
+-- -- physics debug
+-- vtx_line_layout = hg.VertexLayoutPosFloatColorUInt8()
+-- line_shader = hg.LoadProgramFromAssets("shaders/pos_rgb")
 
 -- create material
 pbr_shader = hg.LoadPipelineProgramRefFromAssets('core/shader/pbr.hps', res, hg.GetForwardPipelineInfo())
@@ -131,10 +160,12 @@ end
 keyboard = hg.Keyboard()
 mouse = hg.Mouse()
 
-vtx = hg.Vertices(vtx_line_layout, 2)
+-- vtx = hg.Vertices(vtx_line_layout, 2)
 vid_scene_opaque = 0
 
 local frame = 0
+local flag_capture_texture = false
+local frame_count_capture = -1
 
 while not keyboard:Down(hg.K_Escape) and hg.IsWindowOpen(win) do
     keyboard:Update()
@@ -143,19 +174,30 @@ while not keyboard:Down(hg.K_Escape) and hg.IsWindowOpen(win) do
     view_id = 0
     hg.SceneUpdateSystems(scene, clocks, dt_frame_step, physics, physics_step, 3)
     -- view_id, pass_id = hg.SubmitSceneToPipeline(view_id, scene, hg.IntRect(0, 0, res_x, res_y), true, pipeline, res)
-    view_id, pass_id = hg.SubmitSceneToPipeline(view_id, scene, hg.IntRect(0, 0, res_x, res_y), true, pipeline, res, pipeline_aaa, pipeline_aaa_config, frame)
+    view_id, pass_id = hg.SubmitSceneToPipeline(view_id, scene, hg.IntRect(0, 0, res_x, res_y), true, pipeline, res, pipeline_aaa, pipeline_aaa_config, frame, frame_buffer.handle)
+
+    -- if not flag_capture_texture and frame_count_capture ~= 0xffff then
+	-- 	frame_count_capture, view_id = hg.CaptureTexture(view_id, res, tex_color_ref, tex_readback, picture)
+	-- 	flag_capture_texture = frame_count_capture ~= 0xffff
+    -- end
+
 	vid_scene_opaque = hg.GetSceneForwardPipelinePassViewId(pass_id, hg.SFPP_Opaque)
 
-    -- Debug physics display
-	if enable_physics_debug then
-		hg.SetViewClear(view_id, 0, 0, 1.0, 0)
-		hg.SetViewRect(view_id, 0, 0, res_x, res_y)
-		hg.SetViewTransform(view_id, hg.InverseFast(cam:GetTransform():GetWorld()), hg.ComputePerspectiveProjectionMatrix(c:GetZNear(), c:GetZFar(), hg.FovToZoomFactor(c:GetFov()), hg.Vec2(res_x / res_y, 1)))
-		rs = hg.ComputeRenderState(hg.BM_Opaque, hg.DT_Disabled, hg.FC_Disabled)
-		physics:RenderCollision(view_id, vtx_line_layout, line_shader, rs, 0)
-	end
+	hg.SetViewPerspective(view_id, 0, 0, res_x, res_y, hg.TranslationMat4(hg.Vec3(0, 0, -1.8)))
+
+	val_uniforms = {hg.MakeUniformSetValue('color', hg.Vec4(1, 1, 1, 1))}  -- note: these could be moved out of the main loop but are kept here for readability
+	tex_uniforms = {hg.MakeUniformSetTexture('s_tex', tex_color, 0)}
+
+	hg.DrawModel(view_id, screen_mdl, screen_prg, val_uniforms, tex_uniforms, hg.TransformationMat4(hg.Vec3(0, 0, 0), hg.Vec3(math.pi / 2, math.pi, 0)))
 
     frame = hg.Frame()
+
+    -- -- save captured picture
+    -- if flag_capture_texture and frame_count_capture <= frame then
+	--     hg.SavePNG(picture, "_capture/frame_" .. string.format("%05d", frame) .. ".png")
+	-- 	flag_capture_texture = false
+    -- end
+
     hg.UpdateWindow(win)
 end
 
