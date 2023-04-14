@@ -1,4 +1,5 @@
 hg = require("harfang")
+require("scenarios")
 
 local enable_physics_debug = false
 
@@ -107,23 +108,7 @@ floor, rb_floor = CreatePhysicCubeEx(scene, ground_size, hg.TranslationMat4(hg.V
 rb_floor:SetRestitution(1.0)
 rb_floor:SetFriction(1.0)
 
-cylinders_list = {}
-
-local i, _y, _s, _r, _m
-_y = 5
-_s = 1.0
-_m = 6.0
-_z = {_s + (0.1 * _m), _s - (0.1 * _m), _s + (0.0 * _m), _s + (0.2 * _m), _s - (0.2 * _m), _s + (0.0 * _m)}
-_r = 1.0
-for i = 1, 15 do
-	cylinder_mtx = hg.TransformationMat4(hg.Vec3(0, _y, _z[math.fmod(i, #_z) + 1]), hg.Vec3(hg.Deg(0), hg.Deg(0), hg.Deg(90)))
-	cylinder_node, cylinder_rb = CreatePhysicCylinderEx(scene, cylinder_radius, cylinder_height, cylinder_mtx, cylinder_ref, {mat_grey}, hg.RBT_Dynamic, 1.0)
-	cylinder_rb:SetRestitution(_r)
-	cylinder_rb:SetFriction(1.0)
-	table.insert(cylinders_list, cylinder_node)
-
-	_y = _y + 10.0
-end
+cylinders_list = scenario01(scene, cylinder_radius, cylinder_height, cylinder_ref, mat_grey)
 
 
 -- scene physics
@@ -154,23 +139,6 @@ local frame = 0
 while not keyboard:Down(hg.K_Escape) and hg.IsWindowOpen(win) do
     keyboard:Update()
 	mouse:Update()
-
-	-- for i = 1, 60 do
-	-- 	start_pos = hg.Vec3(-8 + 0.2 * i, 0.75, -5)
-	-- 	end_pos = hg.Vec3(-8 + 0.2 * i, 0.75, 10)
-	-- 	raycast_out = physics:RaycastFirstHit(scene, start_pos, end_pos)
-	-- 	if raycast_out.node:IsValid() then
-	-- 		vtx:Clear()
-	-- 		vtx:Begin(0):SetPos(start_pos):SetColor0(hg.Color.Green):End()
-	-- 		vtx:Begin(1):SetPos(raycast_out.P):SetColor0(hg.Color.Green):End()
-	-- 		hg.DrawLines(vid_scene_opaque, vtx, line_shader)  -- submit all lines in a single call
-	-- 	else
-	-- 		vtx:Clear()
-	-- 		vtx:Begin(0):SetPos(start_pos):SetColor0(hg.Color.Red):End()
-	-- 		vtx:Begin(1):SetPos(end_pos):SetColor0(hg.Color.Red):End()
-	-- 		hg.DrawLines(vid_scene_opaque, vtx, line_shader)  -- submit all lines in a single call
-	-- 	end
-	-- end
 
     view_id = 0
     hg.SceneUpdateSystems(scene, clocks, dt_frame_step, physics, physics_step, 3)

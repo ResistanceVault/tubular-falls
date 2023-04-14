@@ -10,18 +10,8 @@
 			"type": "lua",
 			"request": "launch",
 			"stopOnEntry": false,
-			"program": "${file}",
+			"program": "${workspaceFolder}/main.lua",
 			"cwd": "${workspaceFolder}/",
-			"luaexe": "${workspaceFolder}/bin_win64/lua.exe",
-		},
-		{
-			"name": "With arg",
-			"type": "lua",
-			"request": "launch",
-			"stopOnEntry": false,
-			"program": "${file}",
-			"cwd": "${workspaceFolder}/",
-			"arg": [],
 			"luaexe": "${workspaceFolder}/bin_win64/lua.exe",
 		}
     ]
