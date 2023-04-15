@@ -1,5 +1,6 @@
 hg = require("harfang")
 require("scenarios")
+require("utils")
 
 local enable_physics_debug = false
 
@@ -72,7 +73,7 @@ hg.AddAssetsFolder('assets_compiled')
 hg.InputInit()
 hg.WindowSystemInit()
 
-res_x, res_y = 800, 600
+res_x, res_y = 320, 200
 win = hg.RenderInit('Physics Test', res_x, res_y, hg.RF_VSync | hg.RF_MSAA4X)
 
 pipeline = hg.CreateForwardPipeline()
@@ -82,8 +83,8 @@ res = hg.PipelineResources()
 pipeline_aaa_config = hg.ForwardPipelineAAAConfig()
 pipeline_aaa = hg.CreateForwardPipelineAAAFromAssets("core", pipeline_aaa_config, hg.BR_Equal, hg.BR_Equal)
 pipeline_aaa_config.z_thickness = 0.1
-pipeline_aaa_config.sample_count = 3
-pipeline_aaa_config.temporal_aa_weight = 0.01
+pipeline_aaa_config.sample_count = 6
+pipeline_aaa_config.temporal_aa_weight = 0.001
 -- pipeline_aaa_config.sample_count = 3
 -- pipeline_aaa_config.sample_count = 3
 
@@ -163,11 +164,13 @@ mouse = hg.Mouse()
 -- vtx = hg.Vertices(vtx_line_layout, 2)
 vid_scene_opaque = 0
 
+delete_files_with_prefix("_capture", "frame_")
+
 local frame = 0
 local flag_capture_texture = false
 local frame_count_capture = -1
 
-while not keyboard:Down(hg.K_Escape) and hg.IsWindowOpen(win) do
+while not keyboard:Down(hg.K_Escape) and hg.IsWindowOpen(win) and frame < 800 do
     keyboard:Update()
 	mouse:Update()
 
@@ -209,3 +212,5 @@ hg.DestroyWindow(win)
 
 hg.WindowSystemShutdown()
 hg.InputShutdown()
+
+compress_folder_to_zip("_capture", "capture.zip")
