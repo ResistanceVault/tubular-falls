@@ -176,10 +176,10 @@ while not keyboard:Down(hg.K_Escape) and hg.IsWindowOpen(win) do
     -- view_id, pass_id = hg.SubmitSceneToPipeline(view_id, scene, hg.IntRect(0, 0, res_x, res_y), true, pipeline, res)
     view_id, pass_id = hg.SubmitSceneToPipeline(view_id, scene, hg.IntRect(0, 0, res_x, res_y), true, pipeline, res, pipeline_aaa, pipeline_aaa_config, frame, frame_buffer.handle)
 
-    -- if not flag_capture_texture and frame_count_capture ~= 0xffff then
-	-- 	frame_count_capture, view_id = hg.CaptureTexture(view_id, res, tex_color_ref, tex_readback, picture)
-	-- 	flag_capture_texture = frame_count_capture ~= 0xffff
-    -- end
+    if not flag_capture_texture and frame_count_capture ~= 0xffff then
+		frame_count_capture, view_id = hg.CaptureTexture(view_id, res, tex_color_ref, tex_readback, picture)
+		flag_capture_texture = frame_count_capture ~= 0xffff
+    end
 
 	vid_scene_opaque = hg.GetSceneForwardPipelinePassViewId(pass_id, hg.SFPP_Opaque)
 
@@ -192,11 +192,11 @@ while not keyboard:Down(hg.K_Escape) and hg.IsWindowOpen(win) do
 
     frame = hg.Frame()
 
-    -- -- save captured picture
-    -- if flag_capture_texture and frame_count_capture <= frame then
-	--     hg.SavePNG(picture, "_capture/frame_" .. string.format("%05d", frame) .. ".png")
-	-- 	flag_capture_texture = false
-    -- end
+    -- save captured picture
+    if flag_capture_texture and frame_count_capture <= frame then
+	    hg.SavePNG(picture, "_capture/frame_" .. string.format("%05d", frame) .. ".png")
+		flag_capture_texture = false
+    end
 
     hg.UpdateWindow(win)
 end
